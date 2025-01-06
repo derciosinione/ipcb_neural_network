@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import csv
 
 alpha = 0.2
+student_class_position = 10
 #------------------CÓDIGO GENÉRICO PARA CRIAR, TREINAR E USAR UMA REDE COM UMA CAMADA ESCONDIDA------------
 def make(nx, nz, ny):
     """Funcao que cria, inicializa e devolve uma rede neuronal, incluindo
@@ -139,18 +140,16 @@ Finalmente, devolve duas listas, uma com x padroes (conjunto de treino)
 e a segunda com y padrões (conjunto de teste). Atenção que x+y não pode ultrapassar o nº 
 de estudantes disponível no dataset"""       
 def build_sets(nome_f, x, y):
+
     with open(nome_f, newline='') as csvfile:
         reader = csv.reader(csvfile)
-        next(reader)  # Pula o cabeçalho
+        next(reader)
         data = [row for row in reader]
     
-    # Transforma cada linha em um padrão de treino
     patterns = [translate(row) for row in data]
     
-    # Embaralha os padrões
     random.shuffle(patterns)
     
-    # Divide os padrões em conjuntos de treino e teste
     training_set = patterns[:x]
     test_set = patterns[x:x+y]
     
@@ -161,26 +160,24 @@ e transforma-a num padrão de treino. Cada padrão é uma lista com o seguinte f
 [padrao_de_entrada, classe_do_estudante, padrao_de_saida]
 O enunciado do trabalho explica de que forma deve ser obtido o padrão de entrada
 """
-def translate(lista):
-    # Converte valores categóricos para one-hot encoding
+def translate(lista: list) -> list:
+
     categoricos = converte_categ_numerico(lista)
-    
-    # Normaliza valores numéricos
+
     numericos = normaliza_valores(lista)
     
-    # Combina os valores categóricos e numéricos para formar o padrão de entrada
     input_pattern = categoricos + numericos
     
-    # Classe do estudante
-    student_class = lista[10]
-    
-    # Padrão de saída
-    output_pattern = [1, 0] if student_class == 'Yes' else [0, 1]
-    
+    student_class = lista[student_class_position]
+
+    student_class_output_dict = { 'Yes': [1, 0], 'No': [0, 1]}
+
+    output_pattern  = student_class_output_dict[student_class]
+
     return [input_pattern, student_class, output_pattern]
 
-#Função que converte valores categóricos para a codificação onehot                
-def converte_categ_numerico(instancia):
+
+def converte_categ_numerico(instancia: list) -> list:
     """
     Converte valores categóricos em representações numéricas usando one-hot encoding.
     
@@ -190,25 +187,40 @@ def converte_categ_numerico(instancia):
     Retorna:
     - Uma lista com os valores numéricos correspondentes.
     """
-    # Mapeamento para one-hot encoding
-    gender = {'Male': [1, 0], 'Female': [0, 1]}
-    sleep_duration = {'Less than 5 hours': [1, 0, 0, 0], '5-6 hours': [0, 1, 0, 0], '7-8 hours': [0, 0, 1, 0], 'More than 8 hours': [0, 0, 0, 1]}
-    dietary_habits = {'Healthy': [1, 0, 0], 'Moderate': [0, 1, 0], 'Unhealthy': [0, 0, 1]}
-    yes_no = {'Yes': [1, 0], 'No': [0, 1]}
+
+    gender = {
+        'Male': [1, 0],
+        'Female': [0, 1]
+    }
+
+    sleep_duration = {
+        'Less than 5 hours': [1, 0, 0, 0],
+        '5-6 hours': [0, 1, 0, 0],
+        '7-8 hours': [0, 0, 1, 0],
+        'More than 8 hours': [0, 0, 0, 1]
+    }
+
+    dietary_habits = {
+        'Healthy': [1, 0, 0],
+        'Moderate': [0, 1, 0],
+        'Unhealthy': [0, 0, 1]
+    }
+
+    yes_no = {
+        'Yes': [1, 0],
+        'No': [0, 1]
+    }
     
-    # Aplicando one-hot encoding para cada atributo categórico
     gender_encoded = gender[instancia[0]]
     sleep_encoded = sleep_duration[instancia[4]]
     dietary_encoded = dietary_habits[instancia[5]]
     suicidal_encoded = yes_no[instancia[6]]
     family_history_encoded = yes_no[instancia[9]]
     
-    # Retorna a lista com os valores convertidos
     return gender_encoded + sleep_encoded + dietary_encoded + suicidal_encoded + family_history_encoded
 
 
-"""Função que normaliza os valores necessários"""   
-def normaliza_valores(lista):
+def normaliza_valores(lista: list) -> list:
     """
     Normaliza os valores numéricos para que estejam na mesma escala (entre 0 e 1).
     
@@ -218,14 +230,13 @@ def normaliza_valores(lista):
     Retorna:
     - Uma lista com os valores normalizados.
     """
-    # Normaliza cada valor numérico
+
     age = float(lista[1]) / 100  # Idade máxima considerada como 100
     academic_pressure = float(lista[2]) / 5  # Valor máximo de Academic Pressure é 5
     study_satisfaction = float(lista[3]) / 5  # Valor máximo de Study Satisfaction é 5
     study_hours = float(lista[7]) / 12  # Valor máximo de Study Hours é 12
     financial_stress = float(lista[8]) / 5  # Valor máximo de Financial Stress é 5
-    
-    # Retorna a lista com os valores normalizados
+
     return [age, academic_pressure, study_satisfaction, study_hours, financial_stress]
 
        
@@ -312,6 +323,6 @@ if __name__ == "__main__":
     input_size, hidden_size, output_size = 18, 5, 2
     epochs = 5
     training_set_size = 384
-    test_set_size = 128
+    test_set_size = 128-10
     file = 'Depression Student Dataset.csv'
     run_students(file, input_size, hidden_size, output_size, epochs, training_set_size, test_set_size)
