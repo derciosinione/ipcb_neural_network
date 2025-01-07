@@ -5,6 +5,13 @@ import csv
 
 alpha = 0.2
 student_class_position = 10
+
+max_age = 0
+max_academic_pressure = 0
+max_study_satisfaction = 0
+max_study_hours = 0
+max_financial_stress = 0
+
 #------------------CÓDIGO GENÉRICO PARA CRIAR, TREINAR E USAR UMA REDE COM UMA CAMADA ESCONDIDA------------
 def make(nx, nz, ny):
     """Funcao que cria, inicializa e devolve uma rede neuronal, incluindo
@@ -124,10 +131,10 @@ a funcao que a testa. A funcao recebe como argumento o ficheiro correspondente a
 que deve ser usado, os tamanhos das camadas de entrada, escondida e saída,
 o numero de epocas que deve ser considerado no treino e os tamanhos dos conjuntos de treino e 
 teste"""
-def run_students(file, input_size, hidden_size, output_size, epochs, training_set_size, test_set_size):
+def run_students(file: str, input_size: int, hidden_size: int, output_size: int, epochs: int, training_set_size: int, test_set_size: int):
     training_set, test_set = build_sets(file, training_set_size, test_set_size)
     net = train_students(input_size, hidden_size, output_size, training_set, test_set, epochs)
-    test_students(net, test_set)
+    test_students(net, test_set, printing=True)
 
 
 """Funcao que cria os conjuntos de treino e de teste a partir dos dados
@@ -140,20 +147,23 @@ Finalmente, devolve duas listas, uma com x padroes (conjunto de treino)
 e a segunda com y padrões (conjunto de teste). Atenção que x+y não pode ultrapassar o nº 
 de estudantes disponível no dataset"""       
 def build_sets(nome_f, x, y):
-
     with open(nome_f, newline='') as csvfile:
         reader = csv.reader(csvfile)
         next(reader)
-        data = [row for row in reader]
+        data = list(reader)
+
+    define_max_values(data)
+
+    translated_data = [translate(row) for row in data]
     
-    patterns = [translate(row) for row in data]
+    random.shuffle(translated_data)
     
-    random.shuffle(patterns)
-    
-    training_set = patterns[:x]
-    test_set = patterns[x:x+y]
+    training_set = translated_data[:x]
+    test_set = translated_data[x:x + y]
     
     return training_set, test_set
+
+
 
 """A função translate recebe cada lista de valores que caracterizam um estudante
 e transforma-a num padrão de treino. Cada padrão é uma lista com o seguinte formato 
@@ -161,9 +171,7 @@ e transforma-a num padrão de treino. Cada padrão é uma lista com o seguinte f
 O enunciado do trabalho explica de que forma deve ser obtido o padrão de entrada
 """
 def translate(lista: list) -> list:
-
     categoricos = converte_categ_numerico(lista)
-
     numericos = normaliza_valores(lista)
     
     input_pattern = categoricos + numericos
@@ -231,54 +239,39 @@ def normaliza_valores(lista: list) -> list:
     - Uma lista com os valores normalizados.
     """
 
-    age = float(lista[1]) / 100  # Idade máxima considerada como 100
-    academic_pressure = float(lista[2]) / 5  # Valor máximo de Academic Pressure é 5
-    study_satisfaction = float(lista[3]) / 5  # Valor máximo de Study Satisfaction é 5
-    study_hours = float(lista[7]) / 12  # Valor máximo de Study Hours é 12
-    financial_stress = float(lista[8]) / 5  # Valor máximo de Financial Stress é 5
+    age = float(lista[1]) / max_age
+    academic_pressure = float(lista[2]) / max_academic_pressure
+    study_satisfaction = float(lista[3]) / max_study_satisfaction
+    study_hours = float(lista[7]) / max_study_hours
+    financial_stress = float(lista[8]) / max_financial_stress
 
     return [age, academic_pressure, study_satisfaction, study_hours, financial_stress]
 
        
-
-
 """Cria a rede e chama a funçao iterate para a treinar. A função recebe como argumento 
 o conjunto de treino, os tamanhos das camadas de entrada, escondida e saída e o número 
 de épocas que irão ser usadas para fazer o treino"""
-def train_students(input_size, hidden_size, output_size, training_set, test_set, epochs):
-    net = make(input_size, hidden_size, output_size)
+def train_students(input_size :int, hidden_size:int, output_size:int, training_set: list, test_set: list, epochs: int):
+
+    network = make(input_size, hidden_size, output_size)
     
-    # Listas para armazenar as precisões ao longo das épocas
-    train_accuracies = []
-    test_accuracies = []
+    train_accuracies = list()
+    test_accuracies = list()
     
     for epoch in range(epochs):
-        for pattern in training_set:
-            iterate(epoch, net, pattern[0], pattern[2])
+        for item in training_set: iterate(epoch, network, item[0], item[2])
         
-        # Testa a rede no final de cada época
-        train_accuracy = test_students(net, training_set, printing=False)
-        test_accuracy = test_students(net, test_set, printing=False)
+        train_accuracy = test_students(network, training_set, printing=False)
+        test_accuracy = test_students(network, test_set, printing=False)
         
-        # Armazena as precisões
         train_accuracies.append(train_accuracy)
         test_accuracies.append(test_accuracy)
-        
+
         print(f'Epoch {epoch+1}: Train Accuracy = {train_accuracy:.2f}%, Test Accuracy = {test_accuracy:.2f}%')
 
-    # Plotando o gráfico de precisão
-    plt.plot(range(1, epochs+1), train_accuracies, label='Train Accuracy')
-    plt.plot(range(1, epochs+1), test_accuracies, label='Test Accuracy')
-    plt.xlabel('Epochs')
-    plt.ylabel('Accuracy')
-    plt.title('Training and Test Accuracy over Epochs')
-    
-    # Colocando as legendas no canto inferior direito
-    plt.legend(loc='lower right')
-    
-    plt.show()
+    create_plot(epochs, train_accuracies, test_accuracies)
 
-    return net
+    return network
 
 
 """Funcao que avalia a precisao da rede treinada, utilizando o conjunto de teste ou treino.
@@ -286,19 +279,21 @@ Para cada padrao do conjunto chama a funcao forward e determina a classe do estu
 que corresponde ao maior valor da lista de saida. A classe determinada pela rede deve ser comparada com a classe real,
 sendo contabilizado o número de respostas corretas. A função calcula a percentagem de respostas corretas""" 
 def test_students(net, test_set, printing = True):
-    correct = 0
-    for i, pattern in enumerate(test_set):
-        forward(net, pattern[0])
+    total_correct = 0
+
+    for i, data in enumerate(test_set):
+        forward(net, data[0])
         predicted_class = retranslate(net['y'])
-        true_class = pattern[1]
+        true_class = data[1]
         
         if predicted_class == true_class:
-            correct += 1
+            total_correct += 1
         
         if printing:
             print(f'The network thinks student number {i+1} has depression: {predicted_class}, it should be {true_class}')
-    
-    accuracy = (correct / len(test_set)) * 100
+
+    accuracy = (total_correct / len(test_set)) * 100
+
     if printing:
         print(f'Success rate: {accuracy:.2f}%')
     
@@ -308,6 +303,59 @@ def test_students(net, test_set, printing = True):
 O estado de saúde do estudante corresponde ao indice da saida com maior valor."""  
 def retranslate(out):
     return 'Yes' if out[0] > out[1] else 'No'
+
+def define_max_values(data: list):
+    """
+      Calcula os valores máximos para os atributos numéricos do dataset e armazena em variáveis globais.
+
+      Parâmetros:
+      -----------
+      data: list
+          Lista de listas contendo os dados dos estudantes. Cada sublista representa um estudante.
+
+      Variáveis Globais Definidas:
+      ----------------------------
+      max_age : float
+          Valor máximo da idade (Age).
+      max_academic_pressure : float
+          Valor máximo da pressão acadêmica (Academic Pressure).
+      max_study_satisfaction : float
+          Valor máximo da satisfação com os estudos (Study Satisfaction).
+      max_study_hours : float
+          Valor máximo das horas de estudo (Study Hours).
+      max_financial_stress : float
+          Valor máximo do estresse financeiro (Financial Stress).
+      """
+
+    global max_age, max_academic_pressure, max_study_satisfaction, max_study_hours, max_financial_stress
+
+    max_age = max(float(row[1]) for row in data)
+    max_academic_pressure = max(float(row[2]) for row in data)
+    max_study_satisfaction = max(float(row[3]) for row in data)
+    max_study_hours = max(float(row[7]) for row in data)
+    max_financial_stress = max(float(row[8]) for row in data)
+
+def create_plot(epochs, train_accuracies, test_accuracies):
+    """
+    Plota um gráfico de acurácia de treinamento e teste ao longo das épocas.
+
+    Args:
+        epochs (int): Número total de épocas (iterações de treinamento).
+        train_accuracies (list[float]): Acurácias no conjunto de treinamento por época.
+        test_accuracies (list[float]): Acurácias no conjunto de teste por época.
+
+    Exemplo:
+        create_plot(5, [0.75, 0.80, 0.85, 0.88, 0.90], [0.70, 0.76, 0.80, 0.84, 0.85])
+    """
+
+    plt.plot(range(1, epochs+1), train_accuracies, label='Train Accuracy')
+    plt.plot(range(1, epochs+1), test_accuracies, label='Test Accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.title('Training and Test Accuracy over Epochs')
+    plt.legend(loc='lower right')
+    plt.show()
+
 
 # if __name__ == "__main__":
 #     #Vamos treinar durante 1000 épocas uma rede para aprender a função logica AND
